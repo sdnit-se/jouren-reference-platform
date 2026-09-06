@@ -26,7 +26,11 @@ jobs:
           key: charts-${{ runner.os }}-${{ hashFiles('reference/Chart.lock') }}
       - name: Restore locked chart dependencies
         if: steps.charts.outputs.cache-hit != 'true'
-        run: helm dependency build reference
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add opentelemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm dependency build reference
       - name: Verify chart and lockfile
         run: |
           git diff --exit-code -- reference/Chart.lock
