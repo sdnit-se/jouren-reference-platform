@@ -250,6 +250,10 @@ tempo:
   fullnameOverride: tempo
   tempo:
     retention: 2h
+    # The chart's 1 GiB ballast exceeds this small reference's container budget.
+    memBallastSizeMbs: 0
+    extraEnv:
+      - {name: GOMEMLIMIT, value: 400MiB}
     receivers:
       otlp:
         protocols:
