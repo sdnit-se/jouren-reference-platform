@@ -3,14 +3,13 @@ ingest:
   image: "ghcr.io/sdnit-se/jouren-reference-ingest@sha256:b80ba06fd0ab5416812f96435ca5e864eb9130789c6f1acf408c0b9077463697"
   sourceRevision: "781df5de55b88cefbf768e70620bbf6f28610ba0"
   databaseHost: telemetry-db
-  memory: 192Mi
+  memory: 64Mi
 fleet:
   image: "ghcr.io/sdnit-se/jouren-reference-fleet@sha256:cce351eb81edf66a343190871aa65f849bdb7a2da6f626fc5abd752a46ca0da6"
 database:
   image: docker.io/library/postgres:17.11-bookworm
   existingSecret: telemetry-db
   storage: 5Gi
-
 prometheus:
   fullnameOverride: metrics
   server:
@@ -154,7 +153,6 @@ prometheus:
               for: 30s
               labels: {severity: warning, workload: telemetry-ingest, workload_type: deployment}
               annotations: {summary: "telemetry-ingest query latency is high"}
-
 opentelemetry-collector:
   fullnameOverride: otel-collector
   mode: deployment
@@ -198,7 +196,6 @@ opentelemetry-collector:
         traces: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [otlp/tempo]}
         metrics: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [prometheus]}
         logs: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [otlphttp/loki]}
-
 loki:
   fullnameOverride: loki
   deploymentMode: SingleBinary
@@ -245,7 +242,6 @@ loki:
     selfMonitoring:
       enabled: false
       grafanaAgent: {installOperator: false}
-
 tempo:
   fullnameOverride: tempo
   tempo:
