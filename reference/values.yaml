@@ -25,17 +25,28 @@ prometheus:
     resources:
       requests: {cpu: 100m, memory: 256Mi}
       limits: {memory: 768Mi}
+  # No node exporter, push gateway or broad pod/service discovery.
   scrapeConfigs:
-    prometheus: {enabled: false}
-    kubernetes-api-servers: {enabled: false}
-    kubernetes-nodes: {enabled: false}
-    kubernetes-nodes-cadvisor: {enabled: true}
-    kubernetes-service-endpoints: {enabled: false}
-    kubernetes-service-endpoints-slow: {enabled: false}
-    prometheus-pushgateway: {enabled: false}
-    kubernetes-services: {enabled: false}
-    kubernetes-pods: {enabled: false}
-    kubernetes-pods-slow: {enabled: false}
+    prometheus:
+      enabled: false
+    kubernetes-api-servers:
+      enabled: false
+    kubernetes-nodes:
+      enabled: false
+    kubernetes-nodes-cadvisor:
+      enabled: true
+    kubernetes-service-endpoints:
+      enabled: false
+    kubernetes-service-endpoints-slow:
+      enabled: false
+    prometheus-pushgateway:
+      enabled: false
+    kubernetes-services:
+      enabled: false
+    kubernetes-pods:
+      enabled: false
+    kubernetes-pods-slow:
+      enabled: false
   extraScrapeConfigs: |
     - job_name: otlp
       honor_labels: true
@@ -46,7 +57,10 @@ prometheus:
         - targets: [kube-state-metrics.telemetry.svc.cluster.local:8080]
   alertmanager:
     fullnameOverride: alertmanager
-    persistence: {enabled: true, storageClass: local-path, size: 1Gi}
+    persistence:
+      enabled: true
+      storageClass: local-path
+      size: 1Gi
     resources:
       requests: {cpu: 20m, memory: 32Mi}
       limits: {memory: 128Mi}
@@ -57,17 +71,22 @@ prometheus:
         group_wait: 5s
         group_interval: 10s
         repeat_interval: 1h
-      receivers: [{name: observed}]
+      # Jouren polls through an authenticated Kubernetes API port forward.
+      receivers:
+        - name: observed
   kube-state-metrics:
     fullnameOverride: kube-state-metrics
     namespaces: telemetry
-    metricLabelsAllowlist: ["namespaces=[jouren-operation]"]
+    metricLabelsAllowlist:
+      - namespaces=[jouren-operation]
     collectors: [deployments, namespaces, pods]
     resources:
       requests: {cpu: 20m, memory: 32Mi}
       limits: {memory: 128Mi}
-  prometheus-node-exporter: {enabled: false}
-  prometheus-pushgateway: {enabled: false}
+  prometheus-node-exporter:
+    enabled: false
+  prometheus-pushgateway:
+    enabled: false
   serverFiles:
     recording_rules.yml:
       groups:
@@ -75,30 +94,62 @@ prometheus:
           rules:
             - record: namespace:jouren_operation
               expr: |
-                label_replace(kube_namespace_labels{namespace="telemetry",label_jouren_operation!=""}, "jouren_operation", "$1", "label_jouren_operation", "(.+)")
+                label_replace(
+                  kube_namespace_labels{namespace="telemetry",label_jouren_operation!=""},
+                  "jouren_operation", "$1", "label_jouren_operation", "(.+)"
+                )
             - record: jouren:telemetry_healthy
               labels: {namespace: telemetry, workload: telemetry-ingest}
               expr: |
-                vector(1) and on () (count(up{job=~"otlp|kube-state-metrics|kubernetes-nodes-cadvisor"}) == 3) and on () (min(up{job=~"otlp|kube-state-metrics|kubernetes-nodes-cadvisor"}) == 1) and on () (max(time() - timestamp(up{job=~"otlp|kube-state-metrics|kubernetes-nodes-cadvisor"})) < 30) and on () (max(kube_deployment_status_replicas_available{namespace="telemetry",deployment="telemetry-ingest"}) == 1) and on () (sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest"}[1m])) > 1) and on () ((sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest",http_response_status_code=~"5.."}[1m])) or vector(0)) / sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest"}[1m])) < 0.01) and on () (histogram_quantile(0.99,sum by (le) (rate(http_server_request_duration_seconds_bucket{job="telemetry-ingest",http_route="/readings/query"}[1m]))) < 0.25) and on () (max(container_memory_working_set_bytes{namespace="telemetry",container="telemetry-ingest",image!=""}) < 178257920) and on () (max(deriv(ingest_cache_sensors{job="telemetry-ingest"}[1m])) <= 1)
+                vector(1)
+                and on () (count(up{job=~"otlp|kube-state-metrics|kubernetes-nodes-cadvisor"}) == 3)
+                and on () (min(up{job=~"otlp|kube-state-metrics|kubernetes-nodes-cadvisor"}) == 1)
+                and on () (max(time() - timestamp(up{job=~"otlp|kube-state-metrics|kubernetes-nodes-cadvisor"})) < 30)
+                and on () (max(kube_deployment_status_replicas_available{namespace="telemetry",deployment="telemetry-ingest"}) == 1)
+                and on () (sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest"}[1m])) > 1)
+                and on () (
+                  (sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest",http_response_status_code=~"5.."}[1m])) or vector(0))
+                  / sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest"}[1m])) < 0.01
+                )
+                and on () (histogram_quantile(0.99,
+                  sum by (le) (rate(http_server_request_duration_seconds_bucket{job="telemetry-ingest",http_route="/readings/query"}[1m]))
+                ) < 0.25)
+                and on () (max(container_memory_working_set_bytes{namespace="telemetry",container="telemetry-ingest",image!=""}) < 178257920)
+                and on () (max(deriv(ingest_cache_sensors{job="telemetry-ingest"}[1m])) <= 1)
     alerting_rules.yml:
       groups:
         - name: reference.workload
           rules:
             - alert: WorkloadOOMKilled
               expr: |
-                (kube_pod_container_status_last_terminated_reason{namespace="telemetry",container="telemetry-ingest",reason="OOMKilled"} == 1 and on (namespace,pod,container) increase(kube_pod_container_status_restarts_total{namespace="telemetry",container="telemetry-ingest"}[2m]) > 0) * on (namespace) group_left (jouren_operation) namespace:jouren_operation
+                (
+                  kube_pod_container_status_last_terminated_reason{namespace="telemetry",container="telemetry-ingest",reason="OOMKilled"} == 1
+                  and on (namespace,pod,container)
+                  increase(kube_pod_container_status_restarts_total{namespace="telemetry",container="telemetry-ingest"}[2m]) > 0
+                ) * on (namespace) group_left (jouren_operation) namespace:jouren_operation
               for: 20s
               labels: {severity: critical, workload: telemetry-ingest, workload_type: deployment}
               annotations: {summary: "telemetry-ingest was OOM killed"}
             - alert: IngestErrorRate
               expr: |
-                label_replace((sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest",http_response_status_code=~"5.."}[1m])) / sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest"}[1m]))) > 0.05, "namespace", "telemetry", "", "") * on (namespace) group_left (jouren_operation) namespace:jouren_operation
+                label_replace(
+                  (
+                    sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest",http_response_status_code=~"5.."}[1m]))
+                    / sum(rate(http_server_request_duration_seconds_count{job="telemetry-ingest"}[1m]))
+                  ) > 0.05,
+                  "namespace", "telemetry", "", ""
+                ) * on (namespace) group_left (jouren_operation) namespace:jouren_operation
               for: 30s
               labels: {severity: critical, workload: telemetry-ingest, workload_type: deployment}
               annotations: {summary: "telemetry-ingest is returning errors"}
             - alert: IngestLatencyHigh
               expr: |
-                label_replace(histogram_quantile(0.99,sum by (le) (rate(http_server_request_duration_seconds_bucket{job="telemetry-ingest",http_route="/readings/query"}[2m]))) > 0.25, "namespace", "telemetry", "", "") * on (namespace) group_left (jouren_operation) namespace:jouren_operation
+                label_replace(
+                  histogram_quantile(0.99,
+                    sum by (le) (rate(http_server_request_duration_seconds_bucket{job="telemetry-ingest",http_route="/readings/query"}[2m]))
+                  ) > 0.25,
+                  "namespace", "telemetry", "", ""
+                ) * on (namespace) group_left (jouren_operation) namespace:jouren_operation
               for: 30s
               labels: {severity: warning, workload: telemetry-ingest, workload_type: deployment}
               annotations: {summary: "telemetry-ingest query latency is high"}
@@ -106,8 +157,11 @@ opentelemetry-collector:
   fullnameOverride: otel-collector
   mode: deployment
   replicaCount: 1
-  image: {repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib}
-  resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 256Mi}}
+  image:
+    repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 256Mi}
   ports:
     otlp: {enabled: false}
     otlp-http: {enabled: true}
@@ -117,13 +171,25 @@ opentelemetry-collector:
     jaeger-grpc: {enabled: false}
     zipkin: {enabled: false}
   alternateConfig:
-    extensions: {health_check: {endpoint: "0.0.0.0:13133"}}
-    receivers: {otlp: {protocols: {grpc: null, http: {endpoint: "0.0.0.0:4318"}}}}
-    processors: {batch: {timeout: 2s}, memory_limiter: {check_interval: 5s, limit_percentage: 75, spike_limit_percentage: 15}}
+    extensions:
+      health_check: {endpoint: "0.0.0.0:13133"}
+    receivers:
+      otlp:
+        protocols:
+          grpc: null
+          http: {endpoint: "0.0.0.0:4318"}
+    processors:
+      batch: {timeout: 2s}
+      memory_limiter: {check_interval: 5s, limit_percentage: 75, spike_limit_percentage: 15}
     exporters:
-      prometheus: {endpoint: 0.0.0.0:8889, resource_to_telemetry_conversion: {enabled: false}, add_metric_suffixes: true}
+      prometheus:
+        endpoint: 0.0.0.0:8889
+        resource_to_telemetry_conversion: {enabled: false}
+        add_metric_suffixes: true
       otlphttp/loki: {endpoint: "http://loki.telemetry.svc.cluster.local:3100/otlp"}
-      otlp/tempo: {endpoint: tempo.telemetry.svc.cluster.local:4317, tls: {insecure: true}}
+      otlp/tempo:
+        endpoint: tempo.telemetry.svc.cluster.local:4317
+        tls: {insecure: true}
     service:
       extensions: [health_check]
       pipelines:
@@ -137,13 +203,21 @@ loki:
     auth_enabled: false
     commonConfig: {replication_factor: 1}
     storage: {type: filesystem}
-    schemaConfig: {configs: [{from: "2024-01-01", store: tsdb, object_store: filesystem, schema: v13, index: {prefix: loki_index_, period: 24h}}]}
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index: {prefix: loki_index_, period: 24h}
     limits_config: {allow_structured_metadata: true, retention_period: 24h, volume_enabled: true}
     compactor: {retention_enabled: true, delete_request_store: filesystem}
   singleBinary:
     replicas: 1
     persistence: {enabled: true, storageClass: local-path, size: 2Gi}
-    resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {memory: 512Mi}
   backend: {replicas: 0}
   read: {replicas: 0}
   write: {replicas: 0}
@@ -162,16 +236,28 @@ loki:
   minio: {enabled: false}
   lokiCanary: {enabled: false}
   test: {enabled: false}
-  sidecar: {rules: {enabled: false}}
-  monitoring: {selfMonitoring: {enabled: false, grafanaAgent: {installOperator: false}}}
+  sidecar:
+    rules: {enabled: false}
+  monitoring:
+    selfMonitoring:
+      enabled: false
+      grafanaAgent: {installOperator: false}
 tempo:
   fullnameOverride: tempo
   tempo:
     retention: 2h
+    # The chart's 1 GiB ballast exceeds this small reference's container budget.
     memBallastSizeMbs: 0
-    extraEnv: [{name: GOMEMLIMIT, value: 400MiB}]
-    receivers: {otlp: {protocols: {grpc: {endpoint: "0.0.0.0:4317"}, http: {endpoint: "0.0.0.0:4318"}}}}
+    extraEnv:
+      - {name: GOMEMLIMIT, value: 400MiB}
+    receivers:
+      otlp:
+        protocols:
+          grpc: {endpoint: "0.0.0.0:4317"}
+          http: {endpoint: "0.0.0.0:4318"}
     metricsGenerator: {enabled: false}
     ingester: {max_block_duration: 2m, max_block_bytes: 16777216, complete_block_timeout: 5m, flush_check_period: 10s}
-    resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {memory: 512Mi}
   persistence: {enabled: true, storageClassName: local-path, size: 2Gi}
