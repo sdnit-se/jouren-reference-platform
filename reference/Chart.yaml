@@ -1,0 +1,18 @@
+apiVersion: v2
+name: reference
+description: A small existing-deployment reference for incident response
+type: application
+version: 0.1.0
+dependencies:
+  - name: prometheus
+    version: 29.27.2
+    repository: https://prometheus-community.github.io/helm-charts
+  - name: opentelemetry-collector
+    version: 0.172.0
+    repository: https://open-telemetry.github.io/opentelemetry-helm-charts
+  - name: loki
+    version: 7.3.0
+    repository: https://grafana.github.io/helm-charts
+  - name: tempo
+    version: 1.24.4
+    repository: https://grafana.github.io/helm-charts

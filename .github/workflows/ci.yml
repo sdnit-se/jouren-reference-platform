@@ -1,0 +1,35 @@
+# Publish as .github/workflows/ci.yml in the disposable platform repository.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false}
+      - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db
+        with:
+          version: 2026.8.15
+          sha256: a6dea05e896f1e6090f821588f45397262270e0e0b456252f8d1da28a416f3f2
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        id: charts
+        with:
+          path: reference/charts
+          key: charts-${{ runner.os }}-${{ hashFiles('reference/Chart.lock') }}
+      - name: Restore locked chart dependencies
+        if: steps.charts.outputs.cache-hit != 'true'
+        run: helm dependency build reference
+      - name: Verify chart and lockfile
+        run: |
+          git diff --exit-code -- reference/Chart.lock
+          helm lint --strict reference
+          helm template reference reference --namespace telemetry --kube-version 1.36.3 > rendered.yaml
+          kubeconform -strict -summary rendered.yaml
