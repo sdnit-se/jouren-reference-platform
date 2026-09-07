@@ -79,10 +79,15 @@ spec:
             - {name: FLEET_ADMIN_LISTEN, value: "0.0.0.0:8081"}
             - {name: FLEET_SENSORS, value: "2000"}
             - {name: FLEET_BATCH, value: "50"}
-            - {name: FLEET_POSTS_PER_SEC, value: "40"}
+            - {name: FLEET_POSTS_PER_SEC, value: "2"}
+            - {name: FLEET_ROTATING_POSTS_PER_SEC, value: "8"}
+            - {name: FLEET_ROTATE_EVERY, value: "40"}
             - {name: FLEET_QUERIES_PER_SEC, value: "5"}
-            - {name: FLEET_WARMUP_POSTS_PER_SEC, value: "80"}
-            - {name: FLEET_WARMUP_SECS, value: "300"}
+            - {name: FLEET_WARMUP_POSTS_PER_SEC, value: "20"}
+            - {name: FLEET_WARMUP_SECS, value: "30"}
+            - {name: FLEET_LOAD_POSTS_PER_SEC, value: "80"}
+            - {name: FLEET_LOAD_SECS, value: "300"}
+            - {name: FLEET_LOAD_READINGS, value: "1000000"}
             - {name: FLEET_MODE, value: stable}
           readinessProbe: {httpGet: {path: /healthz, port: admin}, periodSeconds: 5}
 ---

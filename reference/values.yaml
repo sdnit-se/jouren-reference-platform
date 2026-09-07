@@ -5,7 +5,7 @@ ingest:
   databaseHost: telemetry-db
   memory: 192Mi
 fleet:
-  image: "ghcr.io/sdnit-se/jouren-reference-fleet@sha256:cce351eb81edf66a343190871aa65f849bdb7a2da6f626fc5abd752a46ca0da6"
+  image: "ghcr.io/sdnit-se/jouren-reference-fleet@sha256:b4088ab22e2d168239ff42614324e1c12085fc14ce6cb78265383d73da60c83a"
 database:
   image: docker.io/library/postgres:17.11-bookworm
   existingSecret: telemetry-db
