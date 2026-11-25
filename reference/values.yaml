@@ -1,7 +1,7 @@
 # Set immutable images built from the designated source baseline before publication.
 ingest:
-  image: "ghcr.io/sdnit-se/jouren-reference-ingest@sha256:db40b2215dd3b4040d93484b88ffb681e8f518208db75e3a34aa3c30c1cafa5e"
-  sourceRevision: "962e4c5edc3b33edc8b1e901917f1eb207dced4b"
+  image: "ghcr.io/sdnit-se/jouren-reference-ingest@sha256:0e4dce135d897d0df52083a88a229da1db2cd5d228b3f71657d07dbf5aec1e90"
+  sourceRevision: "41501125c2beb7df94e4740e3594b1b140c4025a"
   databaseHost: telemetry-db
   memory: 192Mi
 fleet:
